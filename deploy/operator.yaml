@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maoxian-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: maoxian-operator
+  template:
+    metadata:
+      labels:
+        name: maoxian-operator
+    spec:
+      serviceAccountName: maoxian-operator
+      containers:
+        - name: maoxian-operator
+          # Replace this with the built image name
+          image: REPLACE_IMAGE
+          command:
+          - maoxian-operator
+          imagePullPolicy: Always
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "maoxian-operator"
+            - name: ADMIN_ACCESS
+              valueFrom:
+                secretKeyRef:
+                  name: bot-bot-chart-secret
+                  key: adminAccess
+            - name: GIT_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: bot-bot-chart-config
+                  key: baseUrl
+            - name: BOT_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: bot-bot-chart-config
+                  key: username
+            - name: WEBHOOK
+              valueFrom:
+                configMapKeyRef:
+                  name: bot-bot-chart-config
+                  key: hookUrl

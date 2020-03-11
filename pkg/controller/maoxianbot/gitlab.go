@@ -295,12 +295,11 @@ func addWebhook(client *gitlab.Client, projectId int, hookUrl string, hmacToken 
 	return nil
 }
 
-func generateHmac() string {
+func generateHmac(secretName string) string {
 	secret := "maoxian"
-	data := "lab"
-	log.Info("start generateHmac", "Secret", secret, " Data", data)
+	log.Info("start generateHmac", "Secret", secret, " Data", secretName)
 	h := hmac.New(sha256.New, []byte(secret))
-	h.Write([]byte(data))
+	h.Write([]byte(secretName))
 	sha := hex.EncodeToString(h.Sum(nil))
 	return sha
 }

@@ -128,7 +128,7 @@ func (r *ReconcileMaoxianBot) Reconcile(request reconcile.Request) (reconcile.Re
 	// check Status
 	addList, delList := checkStatus(repoList, repoListStatue)
 	if plat == "gitlab" {
-		webhookToken := generateHmac()
+		webhookToken := generateHmac(secretName)
 		statusList := instance.Status.RepoStatus
 		if len(addList) != 0 {
 			statusList = addMultGitlabBots(statusList, addList, webhookToken)

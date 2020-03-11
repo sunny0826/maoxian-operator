@@ -51,3 +51,5 @@ spec:
                 configMapKeyRef:
                   name: bot-bot-chart-config
                   key: hookUrl
+            - name: SECREC_NAME
+              value: bot-bot-chart-secret

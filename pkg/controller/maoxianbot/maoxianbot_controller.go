@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -79,6 +80,7 @@ var (
 	username    string
 	gitUrl      string
 	hookUrl     string
+	secretName  string
 )
 
 // Reconcile reads that state of the cluster for a MaoxianBot object and makes changes based on the state read
@@ -96,6 +98,7 @@ func (r *ReconcileMaoxianBot) Reconcile(request reconcile.Request) (reconcile.Re
 	username = os.Getenv("BOT_USER")
 	gitUrl = os.Getenv("GIT_URL")
 	hookUrl = os.Getenv("WEBHOOK")
+	secretName = os.Getenv("SECREC_NAME")
 
 	// Fetch the MaoxianBot instance
 	instance := &maoxianv1.MaoxianBot{}
@@ -128,12 +131,24 @@ func (r *ReconcileMaoxianBot) Reconcile(request reconcile.Request) (reconcile.Re
 		webhookToken := generateHmac()
 		statusList := instance.Status.RepoStatus
 		if len(addList) != 0 {
-			statusList = addMultGitlabBots(statusList,addList, webhookToken)
+			statusList = addMultGitlabBots(statusList, addList, webhookToken)
 		}
 		if len(delList) != 0 {
 			statusList = delMultGitlabBots(statusList, delList)
 		}
 		instance.Status.RepoStatus = statusList
+		secret := &corev1.Secret{}
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: request.Namespace}, secret)
+		if err != nil {
+			return forget, err
+		}
+		// update Secret
+		secret.Data["webhookToken"] = []byte(webhookToken)
+		log.Info("update webhook token", "token", webhookToken)
+		err = r.client.Update(context.TODO(), secret)
+		if err != nil {
+			return forget, err
+		}
 	}
 
 	// update Status
@@ -147,10 +162,6 @@ func (r *ReconcileMaoxianBot) Reconcile(request reconcile.Request) (reconcile.Re
 }
 
 func checkStatus(repoList []string, repoListStatue []maoxianv1.RepoStatus) ([]string, []string) {
-	//var (
-	//	update []string
-	//	create []string
-	//)
 	status := set.New(set.ThreadSafe)
 	for _, repoObj := range repoListStatue {
 		status.Add(repoObj.Name)
@@ -161,31 +172,5 @@ func checkStatus(repoList []string, repoListStatue []maoxianv1.RepoStatus) ([]st
 	}
 	addList := set.StringSlice(set.Difference(spec, status))
 	delList := set.StringSlice(set.Difference(status, spec))
-	//fmt.Println(addList)
-	//fmt.Println(delList)
-	//for _, repo := range repoList {
-	//	var (
-	//		exist   bool
-	//		success bool
-	//	)
-	//	for _, status := range repoListStatue {
-	//		if repo == status.Name {
-	//			exist = true
-	//			if status.Success {
-	//				success = true
-	//			}
-	//			break
-	//		}
-	//	}
-	//	if !success {
-	//		if exist {
-	//			//todo 存在但不成功->update
-	//			update = append(update, repo)
-	//		} else {
-	//			// todo 不存在->create
-	//			create = append(create, repo)
-	//		}
-	//	}
-	//}
 	return addList, delList
 }

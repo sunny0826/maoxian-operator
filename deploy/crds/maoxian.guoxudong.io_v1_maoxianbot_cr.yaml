@@ -1,12 +1,10 @@
 apiVersion: maoxian.guoxudong.io/v1
 kind: MaoxianBot
 metadata:
-  name: example-maoxianbot
+  name: kk-maoxianbot
 spec:
   # Add fields here
   plat: gitlab
   repoList:
-    - devops/kk-devops-web
+    - devops/kk-devops-cicd
     - devops/kk-devops-plus
-    - devops/kk-devops
-    - devops/kk-devops-local

@@ -1,0 +1,13 @@
+kind: pipeline
+name: maoxian-operator
+
+steps:
+  - name: build
+    image: guoxudongdocker/build-operator-sdk
+    settings:
+      username:
+        from_secret: docker_user
+      password:
+        from_secret: docker_pass
+      repo: guoxudongdocker/maoxian-operator
+      tags: ${DRONE_BUILD_NUMBER}

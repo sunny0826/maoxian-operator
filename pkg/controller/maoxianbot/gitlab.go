@@ -17,27 +17,23 @@ type GitlabBot struct {
 	Username string
 }
 
-//func updateMultGitlabBots(repoListStatue maoxianv1.MaoxianBotStatus, updateList []string, webhookToken string) maoxianv1.MaoxianBotStatus {
-//	for _, repo := range updateList {
-//		gitlabBot := GitlabBot{
-//			client:   gitlabClient(adminAccess, gitUrl),
-//			HookUrl:  hookUrl,
-//			Repo:     repo,
-//			Username: username,
-//		}
-//		for i, status := range repoListStatue.RepoStatus {
-//			if status.Name == repo {
-//				log.Info("update status", "Status.Name", status.Name)
-//				status = gitlabBot.addGitlabBot(webhookToken)
-//				repoListStatue.RepoStatus[i] = status
-//				break
-//			}
-//		}
-//	}
-//	return repoListStatue
-//}
+func checkAllBots(statusList []maoxianv1.RepoStatus) []maoxianv1.RepoStatus {
+	var result []maoxianv1.RepoStatus
+	for _, status := range statusList {
+		gitlabBot := GitlabBot{
+			client:   gitlabClient(adminAccess, gitUrl),
+			HookUrl:  hookUrl,
+			Repo:     status.Name,
+			Username: username,
+		}
+		item := gitlabBot.checkGitlabBot(webhookToken)
+		result = append(result, item)
+	}
+	return result
+}
 
-func addMultGitlabBots(statusList []maoxianv1.RepoStatus, createList []string, webhookToken string) []maoxianv1.RepoStatus {
+// addMultGitlabBots add gitlab bots
+func addMultGitlabBots(statusList []maoxianv1.RepoStatus, createList []string) []maoxianv1.RepoStatus {
 	for _, repo := range createList {
 		gitlabBot := GitlabBot{
 			client:   gitlabClient(adminAccess, gitUrl),
@@ -51,6 +47,7 @@ func addMultGitlabBots(statusList []maoxianv1.RepoStatus, createList []string, w
 	return statusList
 }
 
+// delMultGitlabBots delete gitlab bots
 func delMultGitlabBots(statusList []maoxianv1.RepoStatus, delList []string) []maoxianv1.RepoStatus {
 	var newStatusList []maoxianv1.RepoStatus
 	for _, status := range statusList {
@@ -78,6 +75,58 @@ func delMultGitlabBots(statusList []maoxianv1.RepoStatus, delList []string) []ma
 	return newStatusList
 }
 
+// checkGitlabBot
+func (git *GitlabBot) checkGitlabBot(webhookToken string) maoxianv1.RepoStatus {
+	status := maoxianv1.RepoStatus{
+		Name:   git.Repo,
+		Status: "Checking",
+	}
+	userId, projectId, err := getId(git.client, git.Username, git.Repo)
+	if err != nil {
+		status.Status = "Failure"
+		status.Error = err.Error()
+		log.Error(err, "git project & user failure")
+		return status
+	}
+	isExit, err := checkMember(git.client, projectId, userId)
+	if err != nil {
+		status.Status = "Failure"
+		status.Error = err.Error()
+		log.Error(err, "check member failure")
+		return status
+	}
+	if !isExit {
+		err = addMember(git.client, projectId, userId)
+		if err != nil {
+			status.Status = "Failure"
+			status.Error = err.Error()
+			log.Error(err, "add member failure")
+			return status
+		}
+	}
+	hookExit, err := checkWebhook(git.client, projectId, git.HookUrl)
+	if err != nil {
+		status.Status = "Failure"
+		status.Error = err.Error()
+		log.Error(err, "check webhook failure")
+		return status
+	}
+	if !hookExit {
+		err = addWebhook(git.client, projectId, git.HookUrl, webhookToken)
+		if err != nil {
+			status.Status = "Failure"
+			status.Error = err.Error()
+			log.Error(err, "add webhook failure")
+			return status
+		}
+	}
+	status.Error = ""
+	status.Status = "Success"
+	status.Success = true
+	return status
+}
+
+// addGitlabBot add gitlab bot
 func (git *GitlabBot) addGitlabBot(webhookToken string) maoxianv1.RepoStatus {
 	status := maoxianv1.RepoStatus{
 		Name:   git.Repo,
@@ -87,18 +136,21 @@ func (git *GitlabBot) addGitlabBot(webhookToken string) maoxianv1.RepoStatus {
 	if err != nil {
 		status.Status = "Failure"
 		status.Error = err.Error()
+		log.Error(err, "git project & user failure")
 		return status
 	}
-	err = checkAndAddMember(git.client, projectId, userId)
+	err = addMember(git.client, projectId, userId)
 	if err != nil {
 		status.Status = "Failure"
 		status.Error = err.Error()
+		log.Error(err, "add member failure")
 		return status
 	}
 	err = addWebhook(git.client, projectId, git.HookUrl, webhookToken)
 	if err != nil {
 		status.Status = "Failure"
 		status.Error = err.Error()
+		log.Error(err, "add webhook failure")
 		return status
 	}
 	status.Error = ""
@@ -107,12 +159,13 @@ func (git *GitlabBot) addGitlabBot(webhookToken string) maoxianv1.RepoStatus {
 	return status
 }
 
+// removeGitlabBot delete gitlab bot
 func (git *GitlabBot) removeGitlabBot() error {
 	userId, projectId, err := getId(git.client, git.Username, git.Repo)
 	if err != nil {
 		return err
 	}
-	err = checkAndRemoveMember(git.client, projectId, userId)
+	err = removeMember(git.client, projectId, userId)
 	if err != nil {
 		return err
 	}
@@ -123,6 +176,7 @@ func (git *GitlabBot) removeGitlabBot() error {
 	return nil
 }
 
+// gitlabClient client of gitlab
 func gitlabClient(secret string, baseUrl string) *gitlab.Client {
 	git := gitlab.NewClient(nil, secret)
 	url := fmt.Sprintf("%s/api/v4", baseUrl)
@@ -133,6 +187,7 @@ func gitlabClient(secret string, baseUrl string) *gitlab.Client {
 	return git
 }
 
+// getId get userId and projectId
 func getId(client *gitlab.Client, username string, repo string) (int, int, error) {
 	userOpt := &gitlab.ListUsersOptions{
 		ListOptions: gitlab.ListOptions{},
@@ -167,11 +222,12 @@ func getId(client *gitlab.Client, username string, repo string) (int, int, error
 	return userId, projectId, nil
 }
 
-func checkAndRemoveMember(client *gitlab.Client, projectId int, userId int) error {
+// checkMember check gitlab member of project
+func checkMember(client *gitlab.Client, projectId int, userId int) (bool, error) {
 	memberOpt := &gitlab.ListProjectMembersOptions{}
 	members, _, err := client.ProjectMembers.ListAllProjectMembers(projectId, memberOpt)
 	if err != nil {
-		return err
+		return false, err
 	}
 	var isExit bool
 	for _, member := range members {
@@ -179,6 +235,15 @@ func checkAndRemoveMember(client *gitlab.Client, projectId int, userId int) erro
 			isExit = true
 			break
 		}
+	}
+	return isExit, nil
+}
+
+// removeMember remove gitlab member of project
+func removeMember(client *gitlab.Client, projectId int, userId int) error {
+	isExit, err := checkMember(client, projectId, userId)
+	if err != nil {
+		return err
 	}
 	if isExit {
 		_, err := client.ProjectMembers.DeleteProjectMember(projectId, userId)
@@ -192,23 +257,16 @@ func checkAndRemoveMember(client *gitlab.Client, projectId int, userId int) erro
 	return nil
 }
 
-func checkAndAddMember(client *gitlab.Client, projectId int, userId int) error {
-	memberOpt := &gitlab.ListProjectMembersOptions{}
-	members, _, err := client.ProjectMembers.ListAllProjectMembers(projectId, memberOpt)
+// checkAndAddMember check and add gitlab member of project
+func addMember(client *gitlab.Client, projectId int, userId int) error {
+	isExit, err := checkMember(client, projectId, userId)
 	if err != nil {
 		return err
-	}
-	var isExit bool
-	for _, member := range members {
-		if member.ID == userId {
-			isExit = true
-			break
-		}
 	}
 	if !isExit {
 		add_opt := &gitlab.AddProjectMemberOptions{
 			UserID:      gitlab.Int(userId),
-			AccessLevel: gitlab.AccessLevel(20),
+			AccessLevel: gitlab.AccessLevel(30),
 		}
 		member, _, err := client.ProjectMembers.AddProjectMember(projectId, add_opt)
 		if err != nil {
@@ -221,6 +279,23 @@ func checkAndAddMember(client *gitlab.Client, projectId int, userId int) error {
 	return nil
 }
 
+// checkWebhook
+func checkWebhook(client *gitlab.Client, projectId int, hookUrl string) (bool, error) {
+	hookOpt := &gitlab.ListProjectHooksOptions{}
+	hooks, _, err := client.Projects.ListProjectHooks(projectId, hookOpt)
+	if err != nil {
+		return false, err
+	}
+	for _, hook := range hooks {
+		if hook.URL == hookUrl {
+			log.V(-1).Info("webhook exists", "url", hookUrl)
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// removeWebhook delete gitlab webhook of project
 func removeWebhook(client *gitlab.Client, projectId int, hookUrl string) error {
 	hookOpt := &gitlab.ListProjectHooksOptions{}
 	hooks, _, err := client.Projects.ListProjectHooks(projectId, hookOpt)
@@ -247,6 +322,7 @@ func removeWebhook(client *gitlab.Client, projectId int, hookUrl string) error {
 	return nil
 }
 
+// addWebhook add gitlab webhook of project
 func addWebhook(client *gitlab.Client, projectId int, hookUrl string, hmacToken string) error {
 	hookOpt := &gitlab.ListProjectHooksOptions{}
 	hooks, _, err := client.Projects.ListProjectHooks(projectId, hookOpt)
@@ -295,6 +371,7 @@ func addWebhook(client *gitlab.Client, projectId int, hookUrl string, hmacToken 
 	return nil
 }
 
+// generateHmac
 func generateHmac(secretName string) string {
 	secret := "maoxian"
 	log.Info("start generateHmac", "Secret", secret, " Data", secretName)

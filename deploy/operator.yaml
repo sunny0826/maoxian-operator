@@ -36,6 +36,11 @@ spec:
                 secretKeyRef:
                   name: bot-bot-chart-secret
                   key: adminAccess
+            - name: WEBHOOK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: bot-bot-chart-secret
+                  key: webhookToken
             - name: GIT_URL
               valueFrom:
                 configMapKeyRef:

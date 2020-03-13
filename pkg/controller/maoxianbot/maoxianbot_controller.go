@@ -76,11 +76,12 @@ type ReconcileMaoxianBot struct {
 }
 
 var (
-	adminAccess string
-	username    string
-	gitUrl      string
-	hookUrl     string
-	secretName  string
+	adminAccess  string
+	username     string
+	gitUrl       string
+	hookUrl      string
+	secretName   string
+	webhookToken string
 )
 
 // Reconcile reads that state of the cluster for a MaoxianBot object and makes changes based on the state read
@@ -99,6 +100,7 @@ func (r *ReconcileMaoxianBot) Reconcile(request reconcile.Request) (reconcile.Re
 	gitUrl = os.Getenv("GIT_URL")
 	hookUrl = os.Getenv("WEBHOOK")
 	secretName = os.Getenv("SECREC_NAME")
+	webhookToken = os.Getenv("WEBHOOK_TOKEN")
 
 	// Fetch the MaoxianBot instance
 	instance := &maoxianv1.MaoxianBot{}
@@ -128,24 +130,16 @@ func (r *ReconcileMaoxianBot) Reconcile(request reconcile.Request) (reconcile.Re
 	// check Status
 	addList, delList := checkStatus(repoList, repoListStatue)
 	if plat == "gitlab" {
-		webhookToken := generateHmac(secretName)
 		statusList := instance.Status.RepoStatus
 		if len(addList) != 0 {
-			statusList = addMultGitlabBots(statusList, addList, webhookToken)
+			statusList = addMultGitlabBots(statusList, addList)
 		}
 		if len(delList) != 0 {
 			statusList = delMultGitlabBots(statusList, delList)
 		}
-		instance.Status.RepoStatus = statusList
+		instance.Status.RepoStatus = checkAllBots(statusList)
 		secret := &corev1.Secret{}
 		err := r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: request.Namespace}, secret)
-		if err != nil {
-			return forget, err
-		}
-		// update Secret
-		secret.Data["webhookToken"] = []byte(webhookToken)
-		log.Info("update webhook token", "token", webhookToken)
-		err = r.client.Update(context.TODO(), secret)
 		if err != nil {
 			return forget, err
 		}

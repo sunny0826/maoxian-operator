@@ -15,4 +15,6 @@ steps:
         from_secret: docker_pass
       dockerfile: build/Dockerfile
       repo: guoxudongdocker/maoxian-operator
-      tag: ${DRONE_BUILD_NUMBER}
+      tags:
+        - ${DRONE_BUILD_NUMBER}
+        - v0.1.1

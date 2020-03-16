@@ -4,8 +4,8 @@ name: maoxian-operator
 steps:
   - name: golang build
     image: golang:1.13
-      commands:
-        - go build -o build/_output/bin/maoxian-operator cmd/manager/main.go
+    commands:
+      - go build -o build/_output/bin/maoxian-operator cmd/manager/main.go
   - name: docker build
     image: plugins/docker
     settings:

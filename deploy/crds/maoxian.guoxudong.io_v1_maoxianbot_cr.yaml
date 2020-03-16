@@ -8,3 +8,5 @@ spec:
   repoList:
     - devops/kk-devops-web
     - devops/kk-devops-plus
+    - devops/kk-devops-cicd
+    - logistics-self/self-business

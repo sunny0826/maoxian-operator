@@ -217,6 +217,7 @@ func getId(client *gitlab.Client, username string, repo string) (int, int, error
 
 // checkMember check gitlab member of project
 func checkMember(client *gitlab.Client, projectId int, userId int) (bool, error) {
+	log.Info("check member","projectId",projectId,"userId",userId)
 	memberOpt := &gitlab.ListProjectMembersOptions{}
 	members, _, err := client.ProjectMembers.ListAllProjectMembers(projectId, memberOpt)
 	if err != nil {

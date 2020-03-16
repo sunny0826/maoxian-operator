@@ -2,14 +2,17 @@ kind: pipeline
 name: maoxian-operator
 
 steps:
-  - name: build
-    image: guoxudongdocker/build-operator-sdk
+  - name: golang build
+    image: golang:1.13
+      commands:
+        - go build -o build/_output/bin/maoxian-operator cmd/manager/main.go
+  - name: docker build
+    image: plugins/docker
     settings:
       username:
         from_secret: docker_user
       password:
         from_secret: docker_pass
+      dockerfile: build/Dockerfile
       repo: guoxudongdocker/maoxian-operator
       tag: ${DRONE_BUILD_NUMBER}
-    command:
-      - export
